@@ -57,3 +57,38 @@ https://wokwi.com/projects/478062753740325889
     
     delay(2000);
     }
+
+
+      {
+      "version": 1,
+      "author": "Akash",
+      "editor": "wokwi",
+      "parts": [
+        { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
+        { "type": "wokwi-potentiometer", "id": "soilPot", "top": -170, "left": -140, "attrs": { "value": "700" } },
+        { "type": "wokwi-dht22", "id": "dht1", "top": -170, "left": 60, "attrs": { "temperature": "28", "humidity": "60" } },
+        { "type": "wokwi-lcd1602", "id": "lcd1", "top": -170, "left": 220, "attrs": { "pins": "i2c" } },
+        { "type": "wokwi-led", "id": "pumpLed", "top": 130, "left": 290, "attrs": { "color": "blue" } },
+        { "type": "wokwi-resistor", "id": "r1", "top": 130, "left": 180, "attrs": { "value": "220" } }
+      ],
+      "connections": [
+        [ "soilPot:VCC", "uno:5V", "red", [] ],
+        [ "soilPot:GND", "uno:GND.1", "black", [] ],
+        [ "soilPot:SIG", "uno:A0", "green", [] ],
+        [ "dht1:VCC", "uno:5V", "red", [] ],
+        [ "dht1:SDA", "uno:2", "green", [] ],
+        [ "dht1:GND", "uno:GND.1", "black", [] ],
+        [ "lcd1:GND", "uno:GND.1", "black", [] ],
+        [ "lcd1:VCC", "uno:5V", "red", [] ],
+        [ "lcd1:SDA", "uno:A4", "blue", [] ],
+        [ "lcd1:SCL", "uno:A5", "yellow", [] ],
+        [ "uno:8", "r1:1", "orange", [] ],
+        [ "r1:2", "pumpLed:A", "orange", [] ],
+        [ "pumpLed:C", "uno:GND.1", "black", [] ]
+      ]
+    }
+    
+    
+
+
+
