@@ -58,6 +58,7 @@ https://wokwi.com/projects/478062753740325889
     delay(2000);
     }
 
+The code below is for the diagram.json of the project
 
       {
       "version": 1,
