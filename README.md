@@ -1,95 +1,121 @@
-# smart-irrigation-simulator-2.0
-Arduino UNO multi-sensor smart irrigation system — pumps only when soil is dry AND temperature is below 32°C, with live I2C LCD readings. Simulated in Wokwi.
-https://wokwi.com/projects/478062753740325889
+# 💧 Smart Irrigation Simulator 2.0
 
-    #include <DHT.h>
-    #include <Wire.h>
-    #include <LiquidCrystal_I2C.h>
-    
-    #define DHTPIN 2
-    #define DHTTYPE DHT22
-    #define SOIL_PIN A0
-    #define PUMP_PIN 8   // Blue LED = pump in Wokwi
-    
-    const int SOIL_DRY = 600;
-    const int SOIL_WET = 450;
-    const float TEMP_LIMIT = 32.0;
-    
-    DHT dht(DHTPIN, DHTTYPE);
-    LiquidCrystal_I2C lcd(0x27, 16, 2);
-    bool pumpOn = false;
-    
-    void setup() {
-      Serial.begin(9600);
-      pinMode(PUMP_PIN, OUTPUT);
-      digitalWrite(PUMP_PIN, LOW);
-      dht.begin();
-      lcd.init();
-      lcd.backlight();
-      lcd.print("Smart Irrigation");
-    delay(2000);
-    }
-    
-    void loop() {
-      int soilRaw = analogRead(SOIL_PIN);      // pot position = soil reading
-      float tempC = dht.readTemperature();     // comes from DHT22 attrs
-    
-    bool soilDry = soilRaw > SOIL_DRY;
-      bool tempOK  = (!isnan(tempC)) && (tempC < TEMP_LIMIT);
-    
-    if (!pumpOn && soilDry && tempOK)          pumpOn = true;   // dry AND cool
-      else if (pumpOn && (soilRaw < SOIL_WET || !tempOK)) pumpOn = false;
-    
-    digitalWrite(PUMP_PIN, pumpOn ? HIGH : LOW);
-    
-    lcd.clear();
-      lcd.setCursor(0, 0);
-      lcd.print("Soil: ");
-      lcd.print(soilRaw);
-      lcd.print(soilDry ? " DRY" : " WET");
-    
-    lcd.setCursor(0, 1);
-      lcd.print("T:");
-      lcd.print(isnan(tempC) ? "--" : String(tempC, 1));
-      lcd.print((char)223);
-      lcd.print("C ");
-      lcd.print(pumpOn ? "PUMP ON" : "PUMP OFF");
-    
-    delay(2000);
-    }
+An Arduino UNO multi-sensor irrigation system that pumps water **only when
+two conditions are both true:** the soil is dry **and** the temperature is
+below 32°C. Live readings, pump status, and DRY/WET state stream to an I2C
+LCD — and the pump won't rapid-cycle near the threshold, thanks to a
+hysteresis band.
 
-The code below is for the diagram.json of the project
+**▶️ Try it live on Wokwi (no hardware required):** https://wokwi.com/projects/478062753740325889
 
-      {
-      "version": 1,
-      "author": "Akash",
-      "editor": "wokwi",
-      "parts": [
-        { "type": "wokwi-arduino-uno", "id": "uno", "top": 0, "left": 0, "attrs": {} },
-        { "type": "wokwi-potentiometer", "id": "soilPot", "top": -170, "left": -140, "attrs": { "value": "700" } },
-        { "type": "wokwi-dht22", "id": "dht1", "top": -170, "left": 60, "attrs": { "temperature": "28", "humidity": "60" } },
-        { "type": "wokwi-lcd1602", "id": "lcd1", "top": -170, "left": 220, "attrs": { "pins": "i2c" } },
-        { "type": "wokwi-led", "id": "pumpLed", "top": 130, "left": 290, "attrs": { "color": "blue" } },
-        { "type": "wokwi-resistor", "id": "r1", "top": 130, "left": 180, "attrs": { "value": "220" } }
-      ],
-      "connections": [
-        [ "soilPot:VCC", "uno:5V", "red", [] ],
-        [ "soilPot:GND", "uno:GND.1", "black", [] ],
-        [ "soilPot:SIG", "uno:A0", "green", [] ],
-        [ "dht1:VCC", "uno:5V", "red", [] ],
-        [ "dht1:SDA", "uno:2", "green", [] ],
-        [ "dht1:GND", "uno:GND.1", "black", [] ],
-        [ "lcd1:GND", "uno:GND.1", "black", [] ],
-        [ "lcd1:VCC", "uno:5V", "red", [] ],
-        [ "lcd1:SDA", "uno:A4", "blue", [] ],
-        [ "lcd1:SCL", "uno:A5", "yellow", [] ],
-        [ "uno:8", "r1:1", "orange", [] ],
-        [ "r1:2", "pumpLed:A", "orange", [] ],
-        [ "pumpLed:C", "uno:GND.1", "black", [] ]
-      ]
-    }
-    
-    
+**Upgraded from:** [smart-irrigation-simulator](https://github.com/AkashBGBhat/smart-irrigation-simulator) (v1: single moisture sensor, no interlocks, no display)
 
+## What's New in 2.0
 
+| | v1 | v2.0 |
+|---|---|---|
+| Pump condition | soil dry only | soil dry **AND** temp < 32°C |
+| Thresholds | one (500) | two — hysteresis band (600 ON / 450 OFF) |
+| Sensor health | none | `isnan()` check on DHT22 |
+| Display | none | 16×2 I2C LCD with live status |
+| Startup | — | splash screen |
 
+## How It Works
+
+Every 2 seconds, the Arduino reads soil moisture (potentiometer on A0,
+0–1023) and temperature (DHT22 on D2), then decides:
+
+```
+soilDry  = reading > 600          (higher = drier in this build)
+tempOK   = temp is valid AND < 32.0°C
+
+Pump turns ON  when:  soilDry  AND  tempOK
+Pump turns OFF when:  reading < 450  OR  temp not OK
+```
+
+### Why two soil thresholds?
+That's a **hysteresis band** (600 → ON, 450 → OFF). With a single threshold,
+soil moisture hovering right at 500 would make the pump flicker on and off
+every cycle — bad for any real pump or relay. The 150-count gap forces the
+soil to genuinely re-wet before the pump stops, giving stable, deliberate
+switching. (This was the top improvement listed in v1's roadmap.)
+
+### Why a temperature interlock?
+Watering during peak heat risks fast evaporation and leaf scorch. The DHT22
+reading must be a valid number (`isnan`-checked) and below 32°C, or the pump
+refuses to run.
+
+The blue LED on pin 8 stands in for the pump in the Wokwi simulation.
+
+## Hardware
+
+| Part | Role |
+|---|---|
+| Arduino UNO | Microcontroller board |
+| Soil moisture sensor (potentiometer in sim) | Moisture reading on A0 |
+| DHT22 | Temperature interlock (digital, pin 2) |
+| Blue LED (pin 8) + 220Ω resistor | Represents the water pump |
+
+## Wiring
+
+| Part | Arduino UNO Pin |
+|---|---|
+| Soil pot VCC / GND / SIG | 5V / GND / A0 |
+| DHT22 VCC / GND / SDA | 5V / GND / D2 |
+| LCD VCC / GND / SDA / SCL | 5V / GND / A4 / A5 |
+| Resistor → LED anode | D8 |
+| LED cathode | GND |
+
+The exact layout is defined in [`diagram.json`](diagram.json) — open the Wokwi
+link above to see the wired circuit.
+
+## Files
+
+- `sketch.ino` — the Arduino program (dual-sensor reads, hysteresis + interlock logic, LCD status)
+- `diagram.json` — Wokwi circuit definition (board, parts, wiring)
+
+## Sample LCD Output
+
+```
+Soil: 720 DRY
+T:28.5°C PUMP ON
+```
+
+## How to Run
+
+**Option 1 — Wokwi (easiest):** click the link above, press ▶️ Play. Drag the
+potentiometer **up** past ~600 with the DHT22 temperature **below 32°C** —
+the blue pump LED lights and the LCD flips to `PUMP ON`. Then:
+- Drop the pot below 450 → pump stops (hysteresis: it won't stop at 600)
+- Raise the DHT22 temperature past 32°C → pump locks out even with dry soil
+
+**Option 2 — Real hardware:** wire the circuit as above, flash the sketch with
+the Arduino IDE, and watch the LCD.
+
+## Concepts Demonstrated
+
+- Compound boolean logic (`&&`, `||`) for multi-condition control
+- Hysteresis bands to prevent output oscillation
+- Sensor failure handling (`isnan()` on DHT22 reads)
+- State tracking across loop iterations (`pumpOn` flag)
+- I2C LCD status display with degree symbol (`(char)223`)
+- I/O interlocks: one bad input blocks the actuator
+
+## Planned Improvements
+
+- [ ] Replace `delay()` with `millis()` for non-blocking reads (see my [weather-station-datalogger](https://github.com/AkashBGBhat/weather-station-datalogger))
+- [ ] Drive an actual relay + water pump
+- [ ] Capacitive soil sensor (real hardware)
+- [ ] Auto mode toggle button (ON / AUTO / OFF states)
+- [ ] Log watering events with timestamps
+- [ ] ESP32 + Wi-Fi scheduling version
+
+## Built With
+
+- Arduino UNO (C++ / Arduino framework)
+- [Wokwi](https://wokwi.com) — browser-based simulation
+- Adafruit DHT + LiquidCrystal_I2C libraries
+
+## Author
+
+**Akash Bhat** — [github.com/AkashBGBhat](https://github.com/AkashBGBhat)
